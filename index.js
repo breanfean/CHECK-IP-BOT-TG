@@ -1,15 +1,20 @@
-import express from 'express';
-import { Telegraf } from 'telegraf';
+const express = require('express');
+const { Telegraf } = require('telegraf');
 
-const BOT_TOKEN = process.env.BOT_TOKEN || 'ТОКЕН_ОТ_BOTFATHER';
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://ИМЯ-ПРИЛОЖЕНИЯ.onrender.com'; 
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://check-ip-bot-tg.onrender.com';
+
+if (!BOT_TOKEN) {
+  console.error('❌ BOT_TOKEN не задан');
+  process.exit(1);
+}
 
 const bot = new Telegraf(BOT_TOKEN);
 
-// Кнопка внизу
+// /start — показываем кнопку внизу
 bot.start((ctx) => {
   return ctx.reply(
-    'Нажми кнопку, чтобы открыть проверку IP 👇',
+    'Нажми кнопку внизу, чтобы открыть проверку IP 👇',
     {
       reply_markup: {
         keyboard: [[
@@ -27,18 +32,24 @@ bot.start((ctx) => {
 const app = express();
 app.use(express.json());
 
-// эндпоинт вебхука
-app.post(`/tg-webhook`, (req, res) => {
-  bot.handleUpdate(req.body);
-  res.sendStatus(200);
+// используем штатный webhookCallback
+app.post('/tg-webhook', bot.webhookCallback('/tg-webhook'));
+
+// простой корневой GET, чтобы Render показывал что-то в браузере
+app.get('/', (req, res) => {
+  res.send('Telegram bot is running ✅');
 });
 
-// запуск сервера
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
 
-  // устанавливаем webhook
-  await bot.telegram.setWebhook(`${WEBHOOK_URL}/tg-webhook`);
-  console.log('Webhook установлен:', `${WEBHOOK_URL}/tg-webhook`);
+app.listen(PORT, async () => {
+  console.log('Server running on port', PORT);
+
+  const webhookUrl = `${WEBHOOK_URL}/tg-webhook`;
+  try {
+    await bot.telegram.setWebhook(webhookUrl);
+    console.log('✅ Webhook установлен:', webhookUrl);
+  } catch (err) {
+    console.error('❌ Ошибка установки webhook:', err.message);
+  }
 });
